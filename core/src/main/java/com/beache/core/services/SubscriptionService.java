@@ -2,6 +2,6 @@ package com.beache.core.services;
 
 public interface SubscriptionService {
 
-    boolean subscibe(UserDate data);
+    boolean subscibe(UserData data);
 
 }

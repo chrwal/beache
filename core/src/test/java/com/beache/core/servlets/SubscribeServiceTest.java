@@ -16,6 +16,7 @@
 package com.beache.core.servlets;
 
 import com.beache.core.services.SubscriptionService;
+import com.beache.core.services.UserData;
 import com.beache.core.services.impl.SubscriptionServiceImpl;
 import io.wcm.testing.mock.aem.junit5.AemContextExtension;
 import org.junit.jupiter.api.Test;
@@ -31,12 +32,16 @@ class SubscribeServiceTest {
 
     @Test
     void testSubscribtionSuccess() {
-        assertTrue(true);
+        assertTrue(subscriptionService.subscibe(
+                UserData.builder().name("Some Body").email("user@host.org").build()
+        ));
     }
 
     @Test
     void testSubscriptionError() {
-        assertFalse(false);
+        assertFalse(subscriptionService.subscibe(
+                UserData.builder().name(null).build()
+        ));
     }
 
 }

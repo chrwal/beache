@@ -16,13 +16,19 @@
 package com.beache.core.servlets;
 
 import com.beache.core.services.SubscriptionService;
-import com.day.cq.commons.jcr.JcrConstants;
+import com.beache.core.services.UserData;
+import com.google.common.collect.ImmutableMap;
+import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.sling.api.SlingHttpServletRequest;
 import org.apache.sling.api.SlingHttpServletResponse;
+import org.apache.sling.api.resource.LoginException;
+import org.apache.sling.api.resource.PersistenceException;
 import org.apache.sling.api.resource.Resource;
+import org.apache.sling.api.resource.ResourceResolver;
+import org.apache.sling.api.resource.ResourceResolverFactory;
+import org.apache.sling.api.resource.ResourceUtil;
 import org.apache.sling.api.servlets.HttpConstants;
 import org.apache.sling.api.servlets.SlingAllMethodsServlet;
-import org.apache.sling.api.servlets.SlingSafeMethodsServlet;
 import org.apache.sling.servlets.annotations.SlingServletResourceTypes;
 import org.osgi.service.component.annotations.Component;
 import org.osgi.service.component.annotations.Reference;
@@ -31,33 +37,58 @@ import org.osgi.service.component.propertytypes.ServiceDescription;
 import javax.servlet.Servlet;
 import javax.servlet.ServletException;
 import java.io.IOException;
+import java.util.Map;
 
 /**
- * Servlet that writes some sample content into the response. It is mounted for
- * all resources of a specific Sling resource type. The
- * {@link SlingSafeMethodsServlet} shall be used for HTTP methods that are
- * idempotent. For write operations use the {@link SlingAllMethodsServlet}.
+ * Send the userdata to the external rest service to subscribe the user for the event.
  */
 @Component(service = Servlet.class)
 @SlingServletResourceTypes(
         resourceTypes="beache/components/page",
         methods=HttpConstants.METHOD_POST,
-        extensions="submit")
+        selectors = "subscribe",
+        extensions = "json")
 @ServiceDescription("Subscribtion Servlet")
-public class SubscribeServlet extends SlingSafeMethodsServlet {
+public class SubscribeServlet extends SlingAllMethodsServlet {
 
     private static final long serialVersionUID = 1L;
 
     @Reference
     private SubscriptionService subscriptionService;
 
+    @Reference
+    private ResourceResolverFactory resourceResolverFactory;
 
     @Override
-    protected void doGet(final SlingHttpServletRequest req,
+    protected void doPost(final SlingHttpServletRequest req,
             final SlingHttpServletResponse resp) throws ServletException, IOException {
-        final Resource resource = req.getResource();
-        resp.setContentType("text/plain");
-        resp.getWriter().write("Title = " + resource.getValueMap().get(JcrConstants.JCR_TITLE));
+        String name = req.getRequestParameter("name").getString(); //todo: check null
+        String email = req.getRequestParameter("email").getString();
+
+        UserData userData = UserData.builder().name(name).email(email).build();
+
+        boolean success = subscriptionService.subscibe(userData);
+        if (success) {
+            try {
+                persistData(req, userData);
+            } catch (LoginException e) {
+                e.printStackTrace(); //todo: logging
+            }
+        }
+        resp.setStatus(success ? 200 : 500);
+    }
+
+    private void persistData(SlingHttpServletRequest req, UserData userData) throws LoginException, PersistenceException {
+        Map<String, Object> auth = ImmutableMap.of(ResourceResolverFactory.SUBSERVICE, "subscriptionService"); //todo: create user mapping
+
+        byte[] md5 = DigestUtils.md5(userData.getName() + userData.getEmail());
+
+        try (ResourceResolver resolver = resourceResolverFactory.getServiceResourceResolver(auth)) {
+            Resource base = resolver.getResource("/var/subscription/base");
+            String newResourceName = ResourceUtil.createUniqueChildName(base, "subscription");
+            ResourceUtil.getOrCreateResource(resolver, newResourceName, ImmutableMap.of("md5", md5), null, true);
+        }
+
     }
 
 }
