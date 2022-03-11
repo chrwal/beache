@@ -1,0 +1,7 @@
+{
+    "scripts": [
+        "create path (sling:OrderedFolder) /content/dam/beache",
+        "create path (nt:unstructured) /content/dam/beache/jcr:content",
+        "set properties on /content/dam/beache/jcr:content\n  set cq:conf{String} to /conf/beache\n  set jcr:title{String} to \"Beach Events\"\nend"
+    ]
+}
